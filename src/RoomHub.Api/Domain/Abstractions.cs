@@ -9,7 +9,7 @@ public interface IRoomRepository
 public interface IBookingRepository
 {
     Task<Booking?> GetByIdAsync(Guid id, CancellationToken ct);
-    Task<List<Booking>> ListForRoomAsync(Guid roomId, CancellationToken ct);
+    Task<List<Booking>> ListActiveForRoomAsync(Guid roomId, CancellationToken ct);
     void Add(Booking booking);
 }
 

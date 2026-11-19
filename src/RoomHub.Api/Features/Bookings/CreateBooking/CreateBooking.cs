@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.EntityFrameworkCore;
 using RoomHub.Api.Domain;
 using RoomHub.Api.Features.Shared;
 
@@ -24,7 +25,7 @@ public sealed class CreateBookingHandler(
         if (room is null)
             return RoomErrors.NotFound;
 
-        var existing = await bookings.ListForRoomAsync(room.Id, ct);
+        var existing = await bookings.ListActiveForRoomAsync(room.Id, ct);
 
         var nowUtc = timeProvider.GetUtcNow().UtcDateTime;
 
@@ -35,7 +36,16 @@ public sealed class CreateBookingHandler(
 
         var booking = result.Value;
         bookings.Add(booking);
-        await unitOfWork.SaveChangesAsync(ct);
+
+        try
+        {
+            await unitOfWork.SaveChangesAsync(ct); // one save: new booking + Room.Version bump
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            // Another request booked this room in the meantime (Version changed): treat it as a conflict.
+            return BookingErrors.ConcurrentBooking;
+        }
 
         return new BookingCreatedResponse(booking.Id, booking.RoomId, booking.Status.ToString());
     }

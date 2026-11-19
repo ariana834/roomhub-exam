@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.EntityFrameworkCore;
 using RoomHub.Api.Domain;
 using RoomHub.Api.Features.Shared;
+using RoomHub.Api.Infrastructure.Persistence;
 
 namespace RoomHub.Api.Features.Bookings.GetBooking;
 
@@ -15,12 +17,12 @@ public sealed record BookingResponse(
     int Attendees,
     string Status);
 
-// Temporary: reads through the repository. With EF Core it will read the DbContext directly (AsNoTracking).
-public sealed class GetBookingHandler(IBookingRepository bookings) : IQueryHandler<GetBookingQuery, BookingResponse>
+// Query: reads the DbContext directly, read-only (AsNoTracking), no repository / unit of work.
+public sealed class GetBookingHandler(RoomHubDbContext db) : IQueryHandler<GetBookingQuery, BookingResponse>
 {
     public async Task<Result<BookingResponse>> HandleAsync(GetBookingQuery query, CancellationToken ct)
     {
-        var b = await bookings.GetByIdAsync(query.Id, ct);
+        var b = await db.Bookings.AsNoTracking().FirstOrDefaultAsync(x => x.Id == query.Id, ct);
         if (b is null)
             return BookingErrors.NotFound;
 

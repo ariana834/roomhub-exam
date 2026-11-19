@@ -1,22 +1,26 @@
 using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.EntityFrameworkCore;
 using RoomHub.Api.Domain;
 using RoomHub.Api.Features.Rooms.CreateRoom;
 using RoomHub.Api.Features.Shared;
+using RoomHub.Api.Infrastructure.Persistence;
 
 namespace RoomHub.Api.Features.Rooms.GetRoom;
 
 public sealed record GetRoomQuery(Guid Id);
 
-// Temporary: reads through the repository. With EF Core it will read the DbContext directly (AsNoTracking).
-public sealed class GetRoomHandler(IRoomRepository rooms) : IQueryHandler<GetRoomQuery, RoomResponse>
+// Query: reads the DbContext directly, read-only (AsNoTracking), no repository / unit of work.
+public sealed class GetRoomHandler(RoomHubDbContext db) : IQueryHandler<GetRoomQuery, RoomResponse>
 {
     public async Task<Result<RoomResponse>> HandleAsync(GetRoomQuery query, CancellationToken ct)
     {
-        var room = await rooms.GetByIdAsync(query.Id, ct);
-        if (room is null)
-            return RoomErrors.NotFound;
+        var room = await db.Rooms
+            .AsNoTracking()
+            .Where(r => r.Id == query.Id)
+            .Select(r => new RoomResponse(r.Id, r.Name, r.Capacity))
+            .FirstOrDefaultAsync(ct);
 
-        return new RoomResponse(room.Id, room.Name, room.Capacity);
+        return room is null ? RoomErrors.NotFound : room;
     }
 }
 
