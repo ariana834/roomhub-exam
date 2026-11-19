@@ -33,7 +33,14 @@ public sealed class Room
         return new Room(Guid.NewGuid(), name.Trim(), capacity);
     }
 
+    public const int LargeRoomCapacity = 10;
     public static readonly TimeSpan MaxBookingDuration = TimeSpan.FromHours(4);
+    public static readonly TimeSpan LargeRoomMaxBookingDuration = TimeSpan.FromHours(2);
+
+    public bool IsLarge => Capacity > LargeRoomCapacity;
+
+    // R6 + R10: large rooms (capacity > 10) max 2h, the others max 4h; the limit itself is allowed.
+    public TimeSpan MaxDuration => IsLarge ? LargeRoomMaxBookingDuration : MaxBookingDuration;
 
     // R2-R7. existingBookings = the bookings of this room; nowUtc comes from TimeProvider.
     public Result<Booking> Book(
@@ -61,8 +68,10 @@ public sealed class Room
         if (range.StartUtc < nowUtc)
             return BookingErrors.StartInPast;                   // R5 (start == now is allowed)
 
-        if (range.Duration > MaxBookingDuration)
-            return BookingErrors.TooLong;                       // R6 (exactly 4h is allowed)
+        if (range.Duration > MaxDuration)
+            return IsLarge
+                ? BookingErrors.TooLongForLargeRoom             // R10 (exactly 2h is allowed)
+                : BookingErrors.TooLong;                        // R6 (exactly 4h is allowed)
 
         if (existingBookings.Any(b => b.IsActive && b.Period.Overlaps(range)))
             return BookingErrors.RoomOccupied;                  // R7 (only active bookings block)
