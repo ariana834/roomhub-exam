@@ -1,22 +1,21 @@
-using RoomHub.Api.Endpoints;
-using RoomHub.Api.Middleware;
-using RoomHub.Api.Repositories;
-using RoomHub.Api.Services;
+using RoomHub.Api.Domain;
+using RoomHub.Api.Features.Shared;
+using RoomHub.Api.Infrastructure.InMemory;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Starter organized in layers: Endpoints -> Services -> Repositories -> Models.
-builder.Services.AddSingleton<RoomRepository>();
-builder.Services.AddSingleton<BookingRepository>();
-builder.Services.AddScoped<RoomService>();
-builder.Services.AddScoped<BookingService>();
+// Temporary in-memory persistence (singletons so data lives as long as the process).
+builder.Services.AddSingleton<IRoomRepository, InMemoryRoomRepository>();
+builder.Services.AddSingleton<IBookingRepository, InMemoryBookingRepository>();
+builder.Services.AddSingleton<IUnitOfWork, InMemoryUnitOfWork>();
+
+builder.Services.AddHandlers();
 
 var app = builder.Build();
 
-app.UseMiddleware<ExceptionMiddleware>();
-
 app.MapGet("/", () => "RoomHub API is running.");
-app.MapRoomEndpoints();
-app.MapBookingEndpoints();
+app.MapFeatures();
 
 app.Run();
+
+public partial class Program;
