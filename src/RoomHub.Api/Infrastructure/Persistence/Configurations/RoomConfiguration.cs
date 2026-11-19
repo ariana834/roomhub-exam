@@ -15,7 +15,6 @@ public sealed class RoomConfiguration : IEntityTypeConfiguration<Room>
         builder.Property(r => r.Capacity).IsRequired();
 
         // Optimistic concurrency: UPDATE ... WHERE Id = @id AND Version = @originalVersion.
-        // Room.Book bumps Version, so two parallel bookings of the same room cannot both be saved.
         builder.Property(r => r.Version).IsConcurrencyToken();
 
         builder.Ignore(r => r.IsLarge);

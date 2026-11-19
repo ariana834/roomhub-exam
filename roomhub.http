@@ -1,55 +1,315 @@
-### Variables
+### RoomHub API - manual checks (VS Code REST Client / Rider HTTP client)
+# Every request has an "# expect:" line with the status (and ProblemDetails title) it should return.
+# Each section creates its own rooms and puts the room id in bookedBy, so the file can be run again
+# on the same database without R9 (max 2 bookings per person per day) kicking in.
 @baseUrl = http://localhost:5090
+@json = application/json
 
-### 1. Create room
-# @name createRoom
+########## CreateRoom ##########
+
+### CreateRoom - happy path (name is trimmed)
+# @name room
+# expect: 201
 POST {{baseUrl}}/api/rooms
-Content-Type: application/json
+Content-Type: {{json}}
 
-{
-  "name": "Study room 1",
-  "capacity": 10
-}
+{ "name": "  Study room 1  ", "capacity": 4 }
 
-###
-@roomId = {{createRoom.response.body.$.id}}
+### CreateRoom - R1 empty name
+# expect: 400 InvalidName
+POST {{baseUrl}}/api/rooms
+Content-Type: {{json}}
 
-### 2. Get room
-GET {{baseUrl}}/api/rooms/{{roomId}}
+{ "name": "   ", "capacity": 4 }
 
-### 3. Get a missing room (expected: 404)
+### CreateRoom - R1 capacity must be strictly positive (edge: 0)
+# expect: 400 InvalidCapacity
+POST {{baseUrl}}/api/rooms
+Content-Type: {{json}}
+
+{ "name": "Room", "capacity": 0 }
+
+### CreateRoom - invalid JSON is ProblemDetails too
+# expect: 400 Bad Request
+POST {{baseUrl}}/api/rooms
+Content-Type: {{json}}
+
+{ "name": "Room",
+
+########## GetRoom ##########
+
+### GetRoom - happy path
+# expect: 200
+GET {{baseUrl}}/api/rooms/{{room.response.body.$.id}}
+
+### GetRoom - missing room
+# expect: 404 RoomNotFound
 GET {{baseUrl}}/api/rooms/00000000-0000-0000-0000-000000000001
 
-### 4. Create booking (change the dates to the future!)
-# @name createBooking
-POST {{baseUrl}}/api/rooms/{{roomId}}/bookings
-Content-Type: application/json
+### GetRoom - id that is not a GUID (edge)
+# expect: 404 Not Found
+GET {{baseUrl}}/api/rooms/not-a-guid
 
-{
-  "bookedBy": "ana",
-  "startUtc": "2030-01-10T10:00:00Z",
-  "endUtc": "2030-01-10T12:00:00Z",
-  "attendees": 4
-}
+########## CreateBooking ##########
 
-###
-@bookingId = {{createBooking.response.body.$.id}}
+### CreateBooking - happy path 10:00-12:00
+# @name booking
+# expect: 201
+POST {{baseUrl}}/api/rooms/{{room.response.body.$.id}}/bookings
+Content-Type: {{json}}
 
-### 5. Get booking
-GET {{baseUrl}}/api/bookings/{{bookingId}}
+{ "bookedBy": "ana-{{room.response.body.$.id}}", "startUtc": "2030-01-10T10:00:00Z", "endUtc": "2030-01-10T12:00:00Z", "attendees": 4 }
 
-### 6. Overlapping booking (expected: 409)
-POST {{baseUrl}}/api/rooms/{{roomId}}/bookings
-Content-Type: application/json
+### CreateBooking - missing room wins over invalid body (404 before validation)
+# expect: 404 RoomNotFound
+POST {{baseUrl}}/api/rooms/00000000-0000-0000-0000-000000000001/bookings
+Content-Type: {{json}}
 
-{
-  "bookedBy": "bogdan",
-  "startUtc": "2030-01-10T11:00:00Z",
-  "endUtc": "2030-01-10T13:00:00Z",
-  "attendees": 4
-}
+{ "bookedBy": "", "startUtc": "2030-01-10T12:00:00Z", "endUtc": "2030-01-10T10:00:00Z", "attendees": 0 }
 
-### 7. Cancel booking
-POST {{baseUrl}}/api/bookings/{{bookingId}}/cancel
+### CreateBooking - R2 bookedBy required
+# expect: 400 InvalidBookedBy
+POST {{baseUrl}}/api/rooms/{{room.response.body.$.id}}/bookings
+Content-Type: {{json}}
 
-### 8. Add your own requests here for the rules in ASSIGNMENT.md
+{ "bookedBy": " ", "startUtc": "2030-02-10T10:00:00Z", "endUtc": "2030-02-10T11:00:00Z", "attendees": 1 }
+
+### CreateBooking - R3 end equal to start (edge)
+# expect: 400 InvalidRange
+POST {{baseUrl}}/api/rooms/{{room.response.body.$.id}}/bookings
+Content-Type: {{json}}
+
+{ "bookedBy": "ana-{{room.response.body.$.id}}", "startUtc": "2030-02-10T10:00:00Z", "endUtc": "2030-02-10T10:00:00Z", "attendees": 1 }
+
+### CreateBooking - R4 attendees 0
+# expect: 400 InvalidAttendees
+POST {{baseUrl}}/api/rooms/{{room.response.body.$.id}}/bookings
+Content-Type: {{json}}
+
+{ "bookedBy": "ana-{{room.response.body.$.id}}", "startUtc": "2030-02-10T10:00:00Z", "endUtc": "2030-02-10T11:00:00Z", "attendees": 0 }
+
+### CreateBooking - R4 attendees over capacity (capacity 4, asks 5)
+# expect: 400 AttendeesExceedCapacity
+POST {{baseUrl}}/api/rooms/{{room.response.body.$.id}}/bookings
+Content-Type: {{json}}
+
+{ "bookedBy": "ana-{{room.response.body.$.id}}", "startUtc": "2030-02-10T10:00:00Z", "endUtc": "2030-02-10T11:00:00Z", "attendees": 5 }
+
+### CreateBooking - R5 start in the past
+# expect: 400 StartInPast
+POST {{baseUrl}}/api/rooms/{{room.response.body.$.id}}/bookings
+Content-Type: {{json}}
+
+{ "bookedBy": "ana-{{room.response.body.$.id}}", "startUtc": "2020-01-10T10:00:00Z", "endUtc": "2020-01-10T11:00:00Z", "attendees": 1 }
+
+### CreateBooking - R6 longer than 4 hours
+# expect: 400 TooLong
+POST {{baseUrl}}/api/rooms/{{room.response.body.$.id}}/bookings
+Content-Type: {{json}}
+
+{ "bookedBy": "bob-{{room.response.body.$.id}}", "startUtc": "2030-03-10T10:00:00Z", "endUtc": "2030-03-10T14:01:00Z", "attendees": 1 }
+
+### CreateBooking - R6 exactly 4 hours is allowed (edge)
+# expect: 201
+POST {{baseUrl}}/api/rooms/{{room.response.body.$.id}}/bookings
+Content-Type: {{json}}
+
+{ "bookedBy": "bob-{{room.response.body.$.id}}", "startUtc": "2030-03-11T10:00:00Z", "endUtc": "2030-03-11T14:00:00Z", "attendees": 1 }
+
+### CreateBooking - R7 overlaps the active 10:00-12:00
+# expect: 409 RoomOccupied
+POST {{baseUrl}}/api/rooms/{{room.response.body.$.id}}/bookings
+Content-Type: {{json}}
+
+{ "bookedBy": "carl-{{room.response.body.$.id}}", "startUtc": "2030-01-10T11:00:00Z", "endUtc": "2030-01-10T13:00:00Z", "attendees": 1 }
+
+### CreateBooking - R7 touching 12:00-14:00 does not overlap (edge)
+# expect: 201
+POST {{baseUrl}}/api/rooms/{{room.response.body.$.id}}/bookings
+Content-Type: {{json}}
+
+{ "bookedBy": "carl-{{room.response.body.$.id}}", "startUtc": "2030-01-10T12:00:00Z", "endUtc": "2030-01-10T14:00:00Z", "attendees": 1 }
+
+### CreateBooking - invalid date is ProblemDetails
+# expect: 400 Bad Request
+POST {{baseUrl}}/api/rooms/{{room.response.body.$.id}}/bookings
+Content-Type: {{json}}
+
+{ "bookedBy": "ana-{{room.response.body.$.id}}", "startUtc": "not-a-date", "endUtc": "2030-01-10T14:00:00Z", "attendees": 1 }
+
+########## GetBooking ##########
+
+### GetBooking - happy path (dates in UTC with Z, status as text)
+# expect: 200
+GET {{baseUrl}}/api/bookings/{{booking.response.body.$.id}}
+
+### GetBooking - missing booking
+# expect: 404 BookingNotFound
+GET {{baseUrl}}/api/bookings/00000000-0000-0000-0000-000000000001
+
+### GetBooking - id that is not a GUID (edge)
+# expect: 404 Not Found
+GET {{baseUrl}}/api/bookings/not-a-guid
+
+########## CancelBooking ##########
+
+### CancelBooking - happy path
+# expect: 204
+POST {{baseUrl}}/api/bookings/{{booking.response.body.$.id}}/cancel
+
+### CancelBooking - R8 already cancelled
+# expect: 409 AlreadyCancelled
+POST {{baseUrl}}/api/bookings/{{booking.response.body.$.id}}/cancel
+
+### CancelBooking - R8 missing booking
+# expect: 404 BookingNotFound
+POST {{baseUrl}}/api/bookings/00000000-0000-0000-0000-000000000001/cancel
+
+### CancelBooking - status is Cancelled afterwards
+# expect: 200
+GET {{baseUrl}}/api/bookings/{{booking.response.body.$.id}}
+
+### CancelBooking - R8 a cancelled booking frees its interval (edge)
+# expect: 201
+POST {{baseUrl}}/api/rooms/{{room.response.body.$.id}}/bookings
+Content-Type: {{json}}
+
+{ "bookedBy": "dora-{{room.response.body.$.id}}", "startUtc": "2030-01-10T10:00:00Z", "endUtc": "2030-01-10T12:00:00Z", "attendees": 1 }
+
+########## R9 - max 2 active bookings per person per UTC day, all rooms ##########
+
+### R9 - room A
+# @name r9RoomA
+# expect: 201
+POST {{baseUrl}}/api/rooms
+Content-Type: {{json}}
+
+{ "name": "R9 room A", "capacity": 5 }
+
+### R9 - room B
+# @name r9RoomB
+# expect: 201
+POST {{baseUrl}}/api/rooms
+Content-Type: {{json}}
+
+{ "name": "R9 room B", "capacity": 5 }
+
+### R9 - 1st booking of the day, room A
+# @name r9First
+# expect: 201
+POST {{baseUrl}}/api/rooms/{{r9RoomA.response.body.$.id}}/bookings
+Content-Type: {{json}}
+
+{ "bookedBy": "dan-{{r9RoomA.response.body.$.id}}", "startUtc": "2032-05-01T08:00:00Z", "endUtc": "2032-05-01T09:00:00Z", "attendees": 1 }
+
+### R9 - 2nd booking, other room, other casing + spaces (same person)
+# expect: 201
+POST {{baseUrl}}/api/rooms/{{r9RoomB.response.body.$.id}}/bookings
+Content-Type: {{json}}
+
+{ "bookedBy": "  DAN-{{r9RoomA.response.body.$.id}}  ", "startUtc": "2032-05-01T10:00:00Z", "endUtc": "2032-05-01T11:00:00Z", "attendees": 1 }
+
+### R9 - 3rd active booking the same day is rejected
+# expect: 409 TooManyBookingsPerDay
+POST {{baseUrl}}/api/rooms/{{r9RoomA.response.body.$.id}}/bookings
+Content-Type: {{json}}
+
+{ "bookedBy": "dan-{{r9RoomA.response.body.$.id}}", "startUtc": "2032-05-01T12:00:00Z", "endUtc": "2032-05-01T13:00:00Z", "attendees": 1 }
+
+### R9 - the day is the UTC date of startUtc: 23:30 is still the same day (edge)
+# expect: 409 TooManyBookingsPerDay
+POST {{baseUrl}}/api/rooms/{{r9RoomB.response.body.$.id}}/bookings
+Content-Type: {{json}}
+
+{ "bookedBy": "dan-{{r9RoomA.response.body.$.id}}", "startUtc": "2032-05-01T23:30:00Z", "endUtc": "2032-05-02T00:30:00Z", "attendees": 1 }
+
+### R9 - another day is not affected
+# expect: 201
+POST {{baseUrl}}/api/rooms/{{r9RoomA.response.body.$.id}}/bookings
+Content-Type: {{json}}
+
+{ "bookedBy": "dan-{{r9RoomA.response.body.$.id}}", "startUtc": "2032-05-02T08:00:00Z", "endUtc": "2032-05-02T09:00:00Z", "attendees": 1 }
+
+### R9 - cancel the 1st booking
+# expect: 204
+POST {{baseUrl}}/api/bookings/{{r9First.response.body.$.id}}/cancel
+
+### R9 - cancelled bookings do not count, so a new one is allowed (edge)
+# expect: 201
+POST {{baseUrl}}/api/rooms/{{r9RoomA.response.body.$.id}}/bookings
+Content-Type: {{json}}
+
+{ "bookedBy": "dan-{{r9RoomA.response.body.$.id}}", "startUtc": "2032-05-01T14:00:00Z", "endUtc": "2032-05-01T15:00:00Z", "attendees": 1 }
+
+########## R10 - rooms with capacity > 10: max 2 hours ##########
+
+### R10 - large room (capacity 11)
+# @name bigRoom
+# expect: 201
+POST {{baseUrl}}/api/rooms
+Content-Type: {{json}}
+
+{ "name": "Big room", "capacity": 11 }
+
+### R10 - large room, 2h01 is rejected
+# expect: 400 TooLongForLargeRoom
+POST {{baseUrl}}/api/rooms/{{bigRoom.response.body.$.id}}/bookings
+Content-Type: {{json}}
+
+{ "bookedBy": "eve-{{bigRoom.response.body.$.id}}", "startUtc": "2031-01-10T10:00:00Z", "endUtc": "2031-01-10T12:01:00Z", "attendees": 1 }
+
+### R10 - large room, exactly 2h is allowed (edge)
+# expect: 201
+POST {{baseUrl}}/api/rooms/{{bigRoom.response.body.$.id}}/bookings
+Content-Type: {{json}}
+
+{ "bookedBy": "eve-{{bigRoom.response.body.$.id}}", "startUtc": "2031-01-11T10:00:00Z", "endUtc": "2031-01-11T12:00:00Z", "attendees": 1 }
+
+### R10 - room with capacity exactly 10 keeps the 4h limit
+# @name tenRoom
+# expect: 201
+POST {{baseUrl}}/api/rooms
+Content-Type: {{json}}
+
+{ "name": "Ten seats", "capacity": 10 }
+
+### R10 - capacity 10, 3h is allowed (edge)
+# expect: 201
+POST {{baseUrl}}/api/rooms/{{tenRoom.response.body.$.id}}/bookings
+Content-Type: {{json}}
+
+{ "bookedBy": "fay-{{tenRoom.response.body.$.id}}", "startUtc": "2031-01-12T10:00:00Z", "endUtc": "2031-01-12T13:00:00Z", "attendees": 1 }
+
+########## R11 - cancel only if the booking starts at least 60 minutes from now ##########
+
+### R11 - room
+# @name r11Room
+# expect: 201
+POST {{baseUrl}}/api/rooms
+Content-Type: {{json}}
+
+{ "name": "R11 room", "capacity": 5 }
+
+### R11 - booking that starts in 30 minutes
+# @name soonBooking
+# expect: 201
+POST {{baseUrl}}/api/rooms/{{r11Room.response.body.$.id}}/bookings
+Content-Type: {{json}}
+
+{ "bookedBy": "gus-{{r11Room.response.body.$.id}}", "startUtc": "{{$datetime iso8601 30 m}}", "endUtc": "{{$datetime iso8601 90 m}}", "attendees": 1 }
+
+### R11 - cancelling it now is too late
+# expect: 409 CancelTooLate
+POST {{baseUrl}}/api/bookings/{{soonBooking.response.body.$.id}}/cancel
+
+### R11 - booking that starts in 3 hours
+# @name laterBooking
+# expect: 201
+POST {{baseUrl}}/api/rooms/{{r11Room.response.body.$.id}}/bookings
+Content-Type: {{json}}
+
+{ "bookedBy": "gus-{{r11Room.response.body.$.id}}", "startUtc": "{{$datetime iso8601 3 h}}", "endUtc": "{{$datetime iso8601 4 h}}", "attendees": 1 }
+
+### R11 - cancelling it is allowed
+# expect: 204
+POST {{baseUrl}}/api/bookings/{{laterBooking.response.body.$.id}}/cancel

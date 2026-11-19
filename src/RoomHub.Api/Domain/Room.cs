@@ -4,7 +4,7 @@ namespace RoomHub.Api.Domain;
 
 public sealed class Room
 {
-    private Room() { } // for EF Core later
+    private Room() { } // EF Core materializes through this; code must use Create
 
     private Room(Guid id, string name, int capacity)
     {
@@ -17,8 +17,8 @@ public sealed class Room
     public string Name { get; private set; } = string.Empty;
     public int Capacity { get; private set; }
 
-    // Bumped on every successful booking; will be the EF Core concurrency token,
-    // so two parallel bookings of the same room cannot both pass the overlap check.
+    // Concurrency token, bumped by Book: of two parallel bookings of the same room only one
+    // can be saved, so both cannot pass the overlap check on stale data.
     public int Version { get; private set; }
 
     // R1
@@ -39,13 +39,13 @@ public sealed class Room
 
     public bool IsLarge => Capacity > LargeRoomCapacity;
 
-    // R6 + R10: large rooms (capacity > 10) max 2h, the others max 4h; the limit itself is allowed.
+    // R6 + R10
     public TimeSpan MaxDuration => IsLarge ? LargeRoomMaxBookingDuration : MaxBookingDuration;
 
     public const int MaxActiveBookingsPerPersonPerDay = 2;
 
-    // R2-R10. existingBookings = the active bookings of this room; nowUtc comes from TimeProvider;
-    // personBookingsThatDay = active bookings of bookedBy on the UTC day of startUtc, in all rooms.
+    // R2-R10. The domain has no database access, so the handler loads what the rules need:
+    // the active bookings of this room, and the person's active bookings that UTC day in all rooms.
     public Result<Booking> Book(
         string? bookedBy,
         DateTime startUtc,
@@ -78,10 +78,10 @@ public sealed class Room
                 : BookingErrors.TooLong;                        // R6 (exactly 4h is allowed)
 
         if (existingBookings.Any(b => b.IsActive && b.Period.Overlaps(range)))
-            return BookingErrors.RoomOccupied;                  // R7 (only active bookings block)
+            return BookingErrors.RoomOccupied;                  // R7
 
         if (personBookingsThatDay >= MaxActiveBookingsPerPersonPerDay)
-            return BookingErrors.TooManyBookingsPerDay;         // R9 (the 3rd one is rejected)
+            return BookingErrors.TooManyBookingsPerDay;         // R9
 
         Version++;
         return Booking.Create(Id, bookedBy.Trim(), range, attendees);

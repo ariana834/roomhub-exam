@@ -10,7 +10,7 @@ public enum BookingStatus
 
 public sealed class Booking
 {
-    private Booking() { } // for EF Core later
+    private Booking() { } // EF Core materializes through this; code must use Room.Book
 
     private Booking(Guid id, Guid roomId, string bookedBy, DateRange period, int attendees)
     {
@@ -40,8 +40,7 @@ public sealed class Booking
 
     public static readonly TimeSpan MinCancelNotice = TimeSpan.FromMinutes(60);
 
-    // R8: Active -> Cancelled; cancelling twice is a conflict.
-    // R11: only if the booking starts at least 60 minutes from now (exactly 60 is allowed).
+    // R8, R11 (exactly 60 minutes before the start is still allowed).
     public Result Cancel(DateTime nowUtc)
     {
         if (!IsActive)

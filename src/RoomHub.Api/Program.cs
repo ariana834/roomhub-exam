@@ -9,7 +9,7 @@ var builder = WebApplication.CreateBuilder(args);
 var dbPath = Path.Combine(builder.Environment.ContentRootPath, "roomhub.db");
 builder.Services.AddDbContext<RoomHubDbContext>(options => options.UseSqlite($"Data Source={dbPath}"));
 
-// The DbContext is the Unit of Work (same scoped instance the repositories use).
+// Same scoped instance as the repositories use, so one SaveChangesAsync commits the whole command.
 builder.Services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<RoomHubDbContext>());
 builder.Services.AddScoped<IRoomRepository, EfRoomRepository>();
 builder.Services.AddScoped<IBookingRepository, EfBookingRepository>();

@@ -22,7 +22,6 @@ public sealed class BookingConfiguration : IEntityTypeConfiguration<Booking>
         builder.Property(b => b.EndUtc).IsRequired();
         builder.Property(b => b.Attendees).IsRequired();
 
-        // Enum stored as text ("Active" / "Cancelled").
         builder.Property(b => b.Status).HasConversion<string>().HasMaxLength(20).IsRequired();
 
         builder.Ignore(b => b.Period);

@@ -24,7 +24,7 @@ public static class HandlerRegistration
         typeof(ICommandHandler<,>), typeof(ICommandHandler<>), typeof(IQueryHandler<,>)
     ];
 
-    // Registers every ICommandHandler / IQueryHandler implementation in this assembly as scoped.
+    // Scoped, because handlers depend on the scoped DbContext.
     public static IServiceCollection AddHandlers(this IServiceCollection services)
     {
         var types = Assembly.GetExecutingAssembly().GetTypes()
