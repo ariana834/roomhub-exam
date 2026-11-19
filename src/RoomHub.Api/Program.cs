@@ -14,6 +14,9 @@ builder.Services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<RoomHubDbCon
 builder.Services.AddScoped<IRoomRepository, EfRoomRepository>();
 builder.Services.AddScoped<IBookingRepository, EfBookingRepository>();
 
+// Every error response (also invalid JSON / bad binding) is ProblemDetails (application/problem+json).
+builder.Services.AddProblemDetails();
+
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddHandlers();
 
@@ -23,6 +26,14 @@ using (var scope = app.Services.CreateScope())
 {
     scope.ServiceProvider.GetRequiredService<RoomHubDbContext>().Database.EnsureCreated();
 }
+
+// Development throws BadHttpRequestException for invalid JSON: keep its 400 instead of a 500 / stack trace.
+app.UseExceptionHandler(new ExceptionHandlerOptions
+{
+    StatusCodeSelector = ex => ex is BadHttpRequestException bad ? bad.StatusCode : StatusCodes.Status500InternalServerError
+});
+// Production returns an empty 400 for invalid JSON: give it a ProblemDetails body.
+app.UseStatusCodePages();
 
 app.MapGet("/", () => "RoomHub API is running.");
 app.MapFeatures();
