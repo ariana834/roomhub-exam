@@ -17,5 +17,6 @@ public static class BookingErrors
     public static readonly Error InvalidAttendees = Error.Validation("InvalidAttendees", "Attendees must be positive.");
     public static readonly Error AttendeesExceedCapacity = Error.Validation("AttendeesExceedCapacity", "The room does not have enough seats.");
     public static readonly Error StartInPast = Error.Validation("StartInPast", "A booking cannot start in the past.");
+    public static readonly Error TooLong = Error.Validation("TooLong", "A booking can last at most 4 hours.");
     public static readonly Error RoomOccupied = Error.Conflict("RoomOccupied", "The room is occupied in this interval.");
 }
