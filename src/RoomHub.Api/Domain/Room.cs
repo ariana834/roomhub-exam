@@ -42,14 +42,18 @@ public sealed class Room
     // R6 + R10: large rooms (capacity > 10) max 2h, the others max 4h; the limit itself is allowed.
     public TimeSpan MaxDuration => IsLarge ? LargeRoomMaxBookingDuration : MaxBookingDuration;
 
-    // R2-R7. existingBookings = the bookings of this room; nowUtc comes from TimeProvider.
+    public const int MaxActiveBookingsPerPersonPerDay = 2;
+
+    // R2-R10. existingBookings = the active bookings of this room; nowUtc comes from TimeProvider;
+    // personBookingsThatDay = active bookings of bookedBy on the UTC day of startUtc, in all rooms.
     public Result<Booking> Book(
         string? bookedBy,
         DateTime startUtc,
         DateTime endUtc,
         int attendees,
         DateTime nowUtc,
-        IEnumerable<Booking> existingBookings)
+        IEnumerable<Booking> existingBookings,
+        int personBookingsThatDay)
     {
         if (string.IsNullOrWhiteSpace(bookedBy))
             return BookingErrors.InvalidBookedBy;               // R2
@@ -75,6 +79,9 @@ public sealed class Room
 
         if (existingBookings.Any(b => b.IsActive && b.Period.Overlaps(range)))
             return BookingErrors.RoomOccupied;                  // R7 (only active bookings block)
+
+        if (personBookingsThatDay >= MaxActiveBookingsPerPersonPerDay)
+            return BookingErrors.TooManyBookingsPerDay;         // R9 (the 3rd one is rejected)
 
         Version++;
         return Booking.Create(Id, bookedBy.Trim(), range, attendees);

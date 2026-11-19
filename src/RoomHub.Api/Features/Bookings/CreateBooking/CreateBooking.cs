@@ -29,8 +29,15 @@ public sealed class CreateBookingHandler(
 
         var nowUtc = timeProvider.GetUtcNow().UtcDateTime;
 
+        // R9: the "day" is the UTC date of startUtc. Empty bookedBy is rejected by Room.Book (R2).
+        var personBookingsThatDay = string.IsNullOrWhiteSpace(command.BookedBy)
+            ? 0
+            : await bookings.CountActiveForPersonOnDayAsync(
+                command.BookedBy, DateOnly.FromDateTime(DateRange.AsUtc(command.StartUtc)), ct);
+
         var result = room.Book(
-            command.BookedBy, command.StartUtc, command.EndUtc, command.Attendees, nowUtc, existing);
+            command.BookedBy, command.StartUtc, command.EndUtc, command.Attendees, nowUtc,
+            existing, personBookingsThatDay);
         if (result.IsFailure)
             return result.Error!;
 

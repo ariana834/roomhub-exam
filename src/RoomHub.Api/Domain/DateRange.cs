@@ -16,9 +16,16 @@ public sealed record DateRange
 
     public TimeSpan Duration => EndUtc - StartUtc;
 
+    // A time with an offset (Local kind) is converted; a time without zone is taken as UTC.
+    public static DateTime AsUtc(DateTime value) =>
+        value.Kind == DateTimeKind.Local ? value.ToUniversalTime() : DateTime.SpecifyKind(value, DateTimeKind.Utc);
+
     // R3
     public static Result<DateRange> Create(DateTime startUtc, DateTime endUtc)
     {
+        startUtc = AsUtc(startUtc);
+        endUtc = AsUtc(endUtc);
+
         if (endUtc <= startUtc)
             return BookingErrors.InvalidRange;
 
