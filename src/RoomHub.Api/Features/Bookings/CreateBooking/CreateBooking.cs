@@ -22,8 +22,8 @@ public sealed class CreateBookingHandler(IRoomRepository rooms, IBookingReposito
 
         var existing = await bookings.ListForRoomAsync(room.Id, ct);
 
-        var result = Booking.Create(
-            room, command.BookedBy, command.StartUtc, command.EndUtc, command.Attendees, existing);
+        var result = room.Book(
+            command.BookedBy, command.StartUtc, command.EndUtc, command.Attendees, existing);
         if (result.IsFailure)
             return result.Error!;
 
