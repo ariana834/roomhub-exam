@@ -16,5 +16,6 @@ public static class BookingErrors
     public static readonly Error InvalidRange = Error.Validation("InvalidRange", "The end must be after the start.");
     public static readonly Error InvalidAttendees = Error.Validation("InvalidAttendees", "Attendees must be positive.");
     public static readonly Error AttendeesExceedCapacity = Error.Validation("AttendeesExceedCapacity", "The room does not have enough seats.");
+    public static readonly Error StartInPast = Error.Validation("StartInPast", "A booking cannot start in the past.");
     public static readonly Error RoomOccupied = Error.Conflict("RoomOccupied", "The room is occupied in this interval.");
 }

@@ -9,6 +9,7 @@ builder.Services.AddSingleton<IRoomRepository, InMemoryRoomRepository>();
 builder.Services.AddSingleton<IBookingRepository, InMemoryBookingRepository>();
 builder.Services.AddSingleton<IUnitOfWork, InMemoryUnitOfWork>();
 
+builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddHandlers();
 
 var app = builder.Build();

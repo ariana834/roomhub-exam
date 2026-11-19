@@ -10,7 +10,11 @@ public sealed record CreateBookingCommand(Guid RoomId, string? BookedBy, DateTim
 
 public sealed record BookingCreatedResponse(Guid Id, Guid RoomId, string Status);
 
-public sealed class CreateBookingHandler(IRoomRepository rooms, IBookingRepository bookings, IUnitOfWork unitOfWork)
+public sealed class CreateBookingHandler(
+    IRoomRepository rooms,
+    IBookingRepository bookings,
+    IUnitOfWork unitOfWork,
+    TimeProvider timeProvider)
     : ICommandHandler<CreateBookingCommand, BookingCreatedResponse>
 {
     public async Task<Result<BookingCreatedResponse>> HandleAsync(CreateBookingCommand command, CancellationToken ct)
@@ -22,8 +26,10 @@ public sealed class CreateBookingHandler(IRoomRepository rooms, IBookingReposito
 
         var existing = await bookings.ListForRoomAsync(room.Id, ct);
 
+        var nowUtc = timeProvider.GetUtcNow().UtcDateTime;
+
         var result = room.Book(
-            command.BookedBy, command.StartUtc, command.EndUtc, command.Attendees, existing);
+            command.BookedBy, command.StartUtc, command.EndUtc, command.Attendees, nowUtc, existing);
         if (result.IsFailure)
             return result.Error!;
 

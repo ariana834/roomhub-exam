@@ -33,13 +33,14 @@ public sealed class Room
         return new Room(Guid.NewGuid(), name.Trim(), capacity);
     }
 
-    // R2, R3, R4, R7. existingBookings = the bookings of this room.
-    // BUG kept (baseline): R5 (start in the past) and R6 (max 4h) are not checked.
+    // R2-R5, R7. existingBookings = the bookings of this room; nowUtc comes from TimeProvider.
+    // BUG kept (baseline): R6 (max 4h) is not checked.
     public Result<Booking> Book(
         string? bookedBy,
         DateTime startUtc,
         DateTime endUtc,
         int attendees,
+        DateTime nowUtc,
         IEnumerable<Booking> existingBookings)
     {
         if (string.IsNullOrWhiteSpace(bookedBy))
@@ -55,6 +56,9 @@ public sealed class Room
 
         if (attendees > Capacity)
             return BookingErrors.AttendeesExceedCapacity;       // R4
+
+        if (range.StartUtc < nowUtc)
+            return BookingErrors.StartInPast;                   // R5 (start == now is allowed)
 
         // BUG kept (baseline): cancelled bookings are not filtered out.
         if (existingBookings.Any(b => b.Period.Overlaps(range)))
