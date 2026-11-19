@@ -38,11 +38,17 @@ public sealed class Booking
     internal static Booking Create(Guid roomId, string bookedBy, DateRange period, int attendees) =>
         new(Guid.NewGuid(), roomId, bookedBy, period, attendees);
 
+    public static readonly TimeSpan MinCancelNotice = TimeSpan.FromMinutes(60);
+
     // R8: Active -> Cancelled; cancelling twice is a conflict.
-    public Result Cancel()
+    // R11: only if the booking starts at least 60 minutes from now (exactly 60 is allowed).
+    public Result Cancel(DateTime nowUtc)
     {
         if (!IsActive)
             return BookingErrors.AlreadyCancelled;
+
+        if (StartUtc - nowUtc < MinCancelNotice)
+            return BookingErrors.CancelTooLate;
 
         Status = BookingStatus.Cancelled;
         return Result.Success();
