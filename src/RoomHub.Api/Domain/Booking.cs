@@ -38,9 +38,12 @@ public sealed class Booking
     internal static Booking Create(Guid roomId, string bookedBy, DateRange period, int attendees) =>
         new(Guid.NewGuid(), roomId, bookedBy, period, attendees);
 
-    // BUG kept (baseline): cancelling an already cancelled booking succeeds instead of 409.
+    // R8: Active -> Cancelled; cancelling twice is a conflict.
     public Result Cancel()
     {
+        if (!IsActive)
+            return BookingErrors.AlreadyCancelled;
+
         Status = BookingStatus.Cancelled;
         return Result.Success();
     }
