@@ -64,9 +64,8 @@ public sealed class Room
         if (range.Duration > MaxBookingDuration)
             return BookingErrors.TooLong;                       // R6 (exactly 4h is allowed)
 
-        // BUG kept (baseline): cancelled bookings are not filtered out.
-        if (existingBookings.Any(b => b.Period.Overlaps(range)))
-            return BookingErrors.RoomOccupied;                  // R7
+        if (existingBookings.Any(b => b.IsActive && b.Period.Overlaps(range)))
+            return BookingErrors.RoomOccupied;                  // R7 (only active bookings block)
 
         Version++;
         return Booking.Create(Id, bookedBy.Trim(), range, attendees);

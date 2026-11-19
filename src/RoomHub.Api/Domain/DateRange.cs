@@ -28,7 +28,7 @@ public sealed record DateRange
     // For values that were already validated (e.g. loaded from storage).
     internal static DateRange FromValidated(DateTime startUtc, DateTime endUtc) => new(startUtc, endUtc);
 
-    // BUG kept (baseline): uses <= so intervals that only touch count as overlapping.
+    // Strict <: intervals that only touch (one ends exactly when the other starts) do not overlap.
     public bool Overlaps(DateRange other) =>
-        StartUtc <= other.EndUtc && other.StartUtc <= EndUtc;
+        StartUtc < other.EndUtc && other.StartUtc < EndUtc;
 }
